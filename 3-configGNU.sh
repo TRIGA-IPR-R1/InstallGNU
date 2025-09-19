@@ -7,7 +7,7 @@ echo """
 ######  Instalação do Sistema Operacional GNU para URT  ######
 ######               Unidade do Reator Triga            ######
 ######                                                  ######
-######          Distribuição: ArchLinux Rolling         ######
+######          Distribuição: Debian 13 (Trixie)        ######
 ######                                                  ######
 ######         Autor: Thalles Oliveira Campagnani       ######
 ######                                                  ######
@@ -25,52 +25,46 @@ echo """
 """
 read -p "Pressione enter para iniciar... "
 
+# Garante que o script pare se algum comando falhar
+set -e
+
+# Atualizar lista de pacotes e instalar ferramentas essenciais
+echo "{[( Atualizando APT e instalando pacotes de configuração )]}"
+apt-get update
+apt-get install -y locales sudo console-setup network-manager openssh-client openssh-server grub-efi
+
 # Configurar fuso horário
-echo "{[( Configurando fuso horário )]}"
-ln -sf /usr/share/zoneinfo/America/Sao_Paulo /etc/localtime
-hwclock --systohc
+#echo "{[( Configurando fuso horário )]}"
+#ln -sf /usr/share/zoneinfo/America/Sao_Paulo /etc/localtime
+#hwclock --systohc
 
 # Locales e mapa do teclado
 echo "{[( Configurando locales e mapa do teclado )]}"
-echo "KEYMAP=br-abnt2" >> /etc/vconsole.conf
+# O padrão Debian para o teclado do console é /etc/default/keyboard
+echo 'XKBMODEL="pc105"' > /etc/default/keyboard
+echo 'XKBLAYOUT="br"' >> /etc/default/keyboard
+echo 'XKBVARIANT="abnt2"' >> /etc/default/keyboard
+echo 'XKBOPTIONS=""' >> /etc/default/keyboard
+echo 'BACKSPACE="guess"' >> /etc/default/keyboard
+
 echo "pt_BR.UTF-8 UTF-8" >> /etc/locale.gen
 locale-gen
-echo """
-LANG=pt_BR.UTF-8
-LANGUAGE=pt_BR.UTF-8
-LC_ADDRESS=pt_BR.UTF-8
-LC_COLLATE=pt_BR.UTF-8
-LC_CTYPE=pt_BR.UTF-8
-LC_IDENTIFICATION=pt_BR.UTF-
-LC_MEASUREMENT=pt_BR.UTF-8
-LC_MESSAGES=pt_BR.UTF-8
-LC_MONETARY=pt_BR.UTF-8
-LC_NAME=pt_BR.UTF-8
-LC_NUMERIC=pt_BR.UTF-8
-LC_PAPER=pt_BR.UTF-8
-LC_TELEPHONE=pt_BR.UTF-8
-LC_TIME=pt_BR.UTF-8
-""" > /etc/locale.conf
+# O padrão Debian para o locale é /etc/default/locale
+echo "LANG=pt_BR.UTF-8" > /etc/default/locale
 
 # Hostname
 echo "{[( Configurando Hostname )]}"
-echo "ServidorTriga" > /etc/hostname
+echo "DT32674CDTN" > /etc/hostname
 echo """
 127.0.0.1   localhost
 ::1         localhost
-127.0.1.1   ServidorTriga.localdomain ServidorTriga
+127.0.1.1   DT32674CDTN.localdomain DT32674CDTN
 """ > /etc/hosts
 
-# Ativando serviço do NetworkManager e SSHD
-echo "{[( Ativando serviço do NetworkManager e SSHD )]}"
+# Ativando serviço do NetworkManager e SSH
+echo "{[( Ativando serviço do NetworkManager e SSH )]}"
 systemctl enable NetworkManager.service
-systemctl enable sshd.service
-
-# Configurar pacman
-echo "{[( Configurando pacman )]}"
-systemctl disable reflector.service
-cp -f /root/mirrorlist /etc/pacman.d/mirrorlist
-cp -f /root/pacman.conf /etc/pacman.conf
+systemctl enable ssh.service
 
 # Senha do root
 echo "{[( Criando senha para root )]}"
@@ -79,7 +73,8 @@ passwd
 # Criando usuário trigauser
 TRIGAUSER=trigauser
 echo "{[( Criando usuário $TRIGAUSER e definindo senha )]}"
-sudo useradd -m $TRIGAUSER && sudo passwd $TRIGAUSER
+useradd -m -s /bin/bash $TRIGAUSER
+passwd $TRIGAUSER
 
 while true; do
     # Criando usuários para manutenção
@@ -92,12 +87,18 @@ while true; do
 
     # Criar usuário e definir senha
     echo "{[( Criando usuário $ADDUSER e definindo senha )]}"
-    sudo useradd -m $ADDUSER && sudo usermod -aG wheel $ADDUSER && sudo passwd $ADDUSER && echo "Usuário $ADDUSER criado com sucesso."
+    # No Debian, o grupo para permissões de sudo é 'sudo'
+    useradd -m -s /bin/bash $ADDUSER
+    usermod -aG sudo $ADDUSER
+    passwd $ADDUSER
+    echo "Usuário $ADDUSER criado com sucesso e adicionado ao grupo sudo."
 
     echo "{[( Você pode adicionar mais usuários para manutenção se quiser )]}"
 done
 
 # GRUB
 echo "{[( Instalando GRUB na UEFI )]}"
-sudo grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ArchLinux
-sudo grub-mkconfig -o /boot/grub/grub.cfg
+grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=Debian
+grub-mkconfig -o /boot/grub/grub.cfg
+
+exit
